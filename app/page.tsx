@@ -1,28 +1,1254 @@
 'use client';
-import {AnimatePresence,motion,useReducedMotion} from 'framer-motion';
-import {ArrowLeft,CalendarDays,Check,CheckCircle2,ChevronRight,Clipboard,Clock3,Copy,Download,FileText,History,Home as HomeIcon,MoreHorizontal,Pencil,Plus,RotateCcw,Search,Settings,Trash2,Upload,UserCheck,UserMinus,UserRoundCheck,Users,X} from 'lucide-react';
-import {useEffect,useMemo,useRef,useState} from 'react';
-type Status='present'|'absent'|'late'|'excused'; type Student={id:string;name:string}; type SchoolClass={id:string;name:string;time:string;students:Student[];archived?:boolean}; type Mark={status:Status;note?:string}; type Session={id:string;classId:string;className:string;date:string;time:string;marks:Record<string,Mark>;students:Student[];savedAt:string}; type View='home'|'attendance'|'summary'|'history'|'manage';
-const rosters:Record<string,string[]>={
-  '3c':['Erik Blechner','Emmanuel-Devid Farber','Anastassia Gunjašina','Sofia Ivanovs','Arina Kekšina','Oskar Klimov','Veronika Koledenkova','Damir Kudrjavkin','Ivan Len','Eva Lott','Miroslav Pavlov','Platon Petrychenko','Oksana Raguzova','Nikita Semtšonok','Adam Sila','Arina Smirnova','Bohdan Strasberh','Maksim Šohan'],
-  '4d':['Daniil Bõkov','Polina Fedotova','Vasilissa Fedotova','Kirill Jartšuk','Dmitri Kudrjavkin','Matvei Rassadkin','Maksim Ratsõborski','Loids Usovs'],
-  '4l':['Ilja Gorbatov','Milena Pruel'],
-  '6cd':['Demid Efremov · 6D','Lucas Juuse · 6C','Rene Juvanen · 6C','Deniss Prilipko · 6C','Mihhail Šnurov · 6C','Mark Tsepelev · 6C','Artjom Vlassov · 6C'],
-  '6f':['Miron Andrianov','Deniss Andrijenko','Deniss Atamanov','Ruslan Budikov','Ruslan Bufatin','Oleksandr Burenko','Danila Gontšarov','Yakym Holin','Denis Komlenkov','Matvei Krupski','Artjom Pavlov','Damir Požaritski','Kirill Rikonen','Nikita Šabanovs','David Vaht'],
-  '4f-lo':['Artjom Skulin'],
-  '6c-lo':['Sofia Aleksejeva','Sofia Bergen','Emilie Denisova','Aleksandra Gorina','Lucas Juuse','Rene Juvanen','Angelina Karpova','Jevgenia Luberg','Angelika Peramets','Deniss Prilipko','Arina Rajanok','Yana Shapoval','Mihhail Šnurov','Arina Šornik','Mark Tsepelev','Artjom Vlassov']
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import {
+  ArrowLeft,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Clipboard,
+  Clock3,
+  Copy,
+  Download,
+  FileText,
+  History,
+  Home as HomeIcon,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Settings,
+  Trash2,
+  Upload,
+  UserCheck,
+  UserMinus,
+  UserRoundCheck,
+  Users,
+  X,
+} from 'lucide-react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+type Status = 'present' | 'absent' | 'late' | 'excused';
+type Student = { id: string; name: string };
+type SchoolClass = {
+  id: string;
+  name: string;
+  time: string;
+  students: Student[];
+  archived?: boolean;
 };
-const classSeed:[string,string,string,string[]][]=[['3c','3C','—',rosters['3c']],['4d','4D · RÕK','—',rosters['4d']],['4l','4L · LÕK','—',rosters['4l']],['6cd','6C/6D · poisid','—',rosters['6cd']],['6f','6F · poisid','—',rosters['6f']],['4f-lo','4F · loodus','—',rosters['4f-lo']],['6c-lo','6C · loodus','—',rosters['6c-lo']]];
-const demoClasses:SchoolClass[]=classSeed.map(([id,name,time,list])=>({id,name,time,students:list.map((n,i)=>({id:`${id}-${i}`,name:n}))}));
-const sm:Record<Status,{label:string;short:string;icon:typeof Check}>={present:{label:'Присутствует',short:'Здесь',icon:Check},absent:{label:'Отсутствует',short:'Нет',icon:X},late:{label:'Опоздал(а)',short:'Опоздал',icon:Clock3},excused:{label:'Освобождён(а)',short:'Освоб.',icon:FileText}};
-const dk=()=>new Date().toISOString().slice(0,10); const hd=(d=dk())=>new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',weekday:'long'}).format(new Date(`${d}T12:00:00`)); const initials=(n:string)=>n.split(' ').map(x=>x[0]).slice(0,2).join('');
-export default function App(){const reduced=useReducedMotion();const[classes,setClasses]=useState(demoClasses);const[sessions,setSessions]=useState<Session[]>([]);const[view,setView]=useState<View>('home');const[active,setActive]=useState<SchoolClass|null>(null);const[marks,setMarks]=useState<Record<string,Mark>>({});const[search,setSearch]=useState('');const[filter,setFilter]=useState<'all'|Status>('all');const[saved,setSaved]=useState(false);const[undo,setUndo]=useState<{id:string;mark:Mark}|null>(null);const[menu,setMenu]=useState<string|null>(null);const[noteFor,setNoteFor]=useState<string|null>(null);const[toast,setToast]=useState('');const importRef=useRef<HTMLInputElement>(null);
-useEffect(()=>{try{const c=localStorage.getItem('sportroll-classes'),s=localStorage.getItem('sportroll-sessions'),version=localStorage.getItem('sportroll-roster-version');if(c&&version==='2')setClasses(JSON.parse(c));else{const existing:SchoolClass[]=c?JSON.parse(c):[];const custom=existing.filter(x=>!['7a','8b','9v'].includes(x.id));setClasses([...demoClasses,...custom.filter(x=>!demoClasses.some(d=>d.id===x.id))]);localStorage.setItem('sportroll-roster-version','2')}if(s)setSessions(JSON.parse(s))}catch{}},[]);useEffect(()=>localStorage.setItem('sportroll-classes',JSON.stringify(classes)),[classes]);useEffect(()=>localStorage.setItem('sportroll-sessions',JSON.stringify(sessions)),[sessions]);useEffect(()=>{if(active&&view==='attendance'){localStorage.setItem(`sportroll-draft-${active.id}-${dk()}`,JSON.stringify(marks));setSaved(true);const t=setTimeout(()=>setSaved(false),1400);return()=>clearTimeout(t)}},[marks,active,view]);
-const counts=useMemo(()=>Object.values(marks).reduce((a,m)=>(a[m.status]++,a),{present:0,absent:0,late:0,excused:0}),[marks]);const notify=(s:string)=>{setToast(s);setTimeout(()=>setToast(''),2100)};const openClass=(c:SchoolClass,existing?:Session)=>{setActive(c);setMarks(existing?.marks??JSON.parse(localStorage.getItem(`sportroll-draft-${c.id}-${dk()}`)||'{}'));setSearch('');setFilter('all');setView('attendance')};const update=(id:string,status:Status)=>{if(marks[id])setUndo({id,mark:marks[id]});setMarks(m=>({...m,[id]:{...m[id],status}}));setMenu(null)};const all=()=>{if(active){setMarks(Object.fromEntries(active.students.map(s=>[s.id,{status:'present'}])));notify('Все отмечены как присутствующие')}};const text=()=>active?`${active.name} · ${hd()} · ${active.time}\nПрисутствуют: ${counts.present}/${active.students.length}\n`+(['absent','late','excused'] as Status[]).map(st=>`${sm[st].label}: ${active.students.filter(s=>marks[s.id]?.status===st).map(s=>s.name).join(', ')}`).filter(x=>!x.endsWith(': ')).join('\n'):'';const copy=async()=>{await navigator.clipboard.writeText(text());notify('Сводка скопирована')};const csv=()=>{if(!active)return;const rows=['Имя,Статус,Примечание',...active.students.map(s=>`"${s.name}","${marks[s.id]?sm[marks[s.id].status].label:'Не отмечен'}","${marks[s.id]?.note||''}"`)];const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv'}));a.download=`${active.name}-${dk()}.csv`;a.click()};const save=()=>{if(!active)return;const s:Session={id:`${active.id}-${dk()}`,classId:active.id,className:active.name,date:dk(),time:active.time,marks,students:active.students,savedAt:new Date().toISOString()};setSessions(x=>[s,...x.filter(y=>y.id!==s.id)]);localStorage.removeItem(`sportroll-draft-${active.id}-${dk()}`);notify('Посещаемость сохранена');setView('home')};const back=()=>setView(view==='summary'?'attendance':'home');const exportBackup=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({classes,sessions},null,2)],{type:'application/json'}));a.download='sportroll-backup.json';a.click()};const restore=(f?:File)=>{if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(String(r.result));setClasses(d.classes);setSessions(d.sessions);notify('Копия восстановлена')}catch{notify('Файл не читается')}};r.readAsText(f)};
-return <div className="app-shell"><AnimatePresence mode="wait"><motion.main key={view} initial={reduced?false:{opacity:0,x:12}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-8}} transition={{duration:.18}} className="page">{view==='home'&&<HomeView classes={classes.filter(c=>!c.archived)} sessions={sessions} open={openClass} history={()=>setView('history')} manage={()=>setView('manage')}/>} {view==='attendance'&&active&&<Attendance active={active} marks={marks} setMarks={setMarks} counts={counts} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} update={update} all={all} back={back} finish={()=>setView('summary')} saved={saved} undo={undo} onUndo={()=>{if(undo)setMarks(m=>({...m,[undo.id]:undo.mark}));setUndo(null)}} menu={menu} setMenu={setMenu} noteFor={noteFor} setNoteFor={setNoteFor}/>} {view==='summary'&&active&&<Summary active={active} marks={marks} counts={counts} back={back} save={save} copy={copy} csv={csv}/>} {view==='history'&&<HistoryView sessions={sessions} classes={classes} back={back} open={s=>{const c=classes.find(x=>x.id===s.classId);if(c)openClass(c,s)}} remove={id=>confirm('Удалить эту запись?')&&setSessions(x=>x.filter(s=>s.id!==id))}/>} {view==='manage'&&<Manage classes={classes} setClasses={setClasses} back={back} exportBackup={exportBackup} importRef={importRef} restore={restore}/>}</motion.main></AnimatePresence>{view==='home'&&<nav className="bottom-nav"><Nav icon={HomeIcon} label="Сегодня" active onClick={()=>{}}/><Nav icon={History} label="История" onClick={()=>setView('history')}/><Nav icon={Users} label="Классы" onClick={()=>setView('manage')}/></nav>}<AnimatePresence>{toast&&<motion.div className="toast" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}><CheckCircle2/>{toast}</motion.div>}</AnimatePresence></div>}
-function HomeView({classes,sessions,open,history,manage}:{classes:SchoolClass[];sessions:Session[];open:(c:SchoolClass)=>void;history:()=>void;manage:()=>void}){const h=new Date().getHours();return <><header className="home-head"><div><p className="eyebrow">{hd()}</p><h1>{h<12?'Доброе утро':h<18?'Добрый день':'Добрый вечер'}, учитель</h1><p className="sub">Кого отмечаем сегодня?</p></div><button className="icon-btn" onClick={manage}><Settings/></button></header><section className="hero-action"><div className="hero-icon"><UserCheck/></div><div><span>Быстрая отметка</span><strong>Начать посещаемость</strong></div><ChevronRight/></section><section><div className="section-title"><h2>Сегодняшние классы</h2><span>{classes.length} урока</span></div><div className="class-list">{classes.map((c,i)=>{const done=sessions.some(s=>s.classId===c.id&&s.date===dk());return <motion.button className="class-card" key={c.id} onClick={()=>open(c)} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:i*.04}}><div className="class-badge">{c.name}</div><div className="class-info"><strong>{c.students.length} учеников</strong><span><Clock3/>{c.time} · Спортзал</span></div>{done?<span className="done"><Check/>Готово</span>:<span className="start">Начать <ChevronRight/></span>}</motion.button>})}</div></section><section className="recent"><div className="section-title"><h2>Недавние записи</h2><button onClick={history}>Все записи</button></div>{sessions.length?<div className="recent-row"><div className="recent-date"><strong>{new Date(sessions[0].date).getDate()}</strong><span>сен</span></div><div><strong>{sessions[0].className} · {sessions[0].time}</strong><span>{Object.values(sessions[0].marks).filter(m=>m.status==='present').length} из {sessions[0].students.length} присутствовали</span></div><ChevronRight/></div>:<div className="empty-mini"><CalendarDays/>Завершённые уроки появятся здесь</div>}</section></>}
-function Attendance(p:{active:SchoolClass;marks:Record<string,Mark>;setMarks:React.Dispatch<React.SetStateAction<Record<string,Mark>>>;counts:Record<Status,number>;search:string;setSearch:(s:string)=>void;filter:'all'|Status;setFilter:(s:'all'|Status)=>void;update:(id:string,s:Status)=>void;all:()=>void;back:()=>void;finish:()=>void;saved:boolean;undo:{id:string;mark:Mark}|null;onUndo:()=>void;menu:string|null;setMenu:(s:string|null)=>void;noteFor:string|null;setNoteFor:(s:string|null)=>void}){const shown=p.active.students.filter(s=>s.name.toLowerCase().includes(p.search.toLowerCase())&&(p.filter==='all'||p.marks[s.id]?.status===p.filter));return <div className="attendance"><header className="att-head"><button className="icon-btn" onClick={p.back}><ArrowLeft/></button><div><h1>{p.active.name}</h1><span>{hd()} · {p.active.time}</span></div><button className="icon-btn"><MoreHorizontal/></button></header><div className="progress-wrap"><div><strong>{Object.keys(p.marks).length} из {p.active.students.length}</strong><span>{p.saved?'Сохранено локально':'Отмечено'}</span></div><div className="progress"><i style={{width:`${Object.keys(p.marks).length/p.active.students.length*100}%`}}/></div></div><div className="tools"><label className="search"><Search/><input value={p.search} onChange={e=>p.setSearch(e.target.value)} placeholder="Найти ученика"/></label><button className="all-present" onClick={p.all}><UserRoundCheck/>Все здесь</button></div><div className="counts"><button className={p.filter==='all'?'active':''} onClick={()=>p.setFilter('all')}><b>{p.active.students.length}</b><span>Все</span></button>{(['present','absent','late','excused'] as Status[]).map(st=><button key={st} className={`${st} ${p.filter===st?'active':''}`} onClick={()=>p.setFilter(st)}><b>{p.counts[st]}</b><span>{sm[st].short}</span></button>)}</div><div className="roster">{shown.map((s,i)=>{const st=p.marks[s.id]?.status;return <motion.div key={s.id} className={`student-row ${st||'unchecked'}`} initial={{opacity:0,y:5}} animate={{opacity:1,y:0}} transition={{delay:Math.min(i*.018,.2)}}><button className="student-main" onClick={()=>p.update(s.id,st==='present'?'absent':'present')}><span className="avatar">{initials(s.name)}</span><span className="student-name"><strong>{s.name}</strong><small>{p.marks[s.id]?.note||(!st?'Нажмите, чтобы отметить':'')}</small></span>{st?(()=>{const I=sm[st].icon;return <span className={`state ${st}`}><I/>{sm[st].short}</span>})():<span className="state empty">—</span>}</button><button className="more" onClick={()=>p.setMenu(p.menu===s.id?null:s.id)}><MoreHorizontal/></button>{p.menu===s.id&&<div className="status-menu">{(['present','absent','late','excused'] as Status[]).map(x=>{const I=sm[x].icon;return <button key={x} onClick={()=>p.update(s.id,x)}><I className={x}/>{sm[x].label}</button>})}<button onClick={()=>{p.setNoteFor(s.id);p.setMenu(null)}}><Pencil/>Примечание</button></div>}</motion.div>})}{!shown.length&&<div className="empty"><Search/><h3>Никого не нашли</h3><p>Измените поиск или фильтр</p></div>}</div>{p.undo&&<button className="undo" onClick={p.onUndo}><RotateCcw/>Отменить изменение</button>}<div className="sticky-finish"><button onClick={p.finish}>Завершить отметку <span>{Object.keys(p.marks).length}/{p.active.students.length}</span></button></div>{p.noteFor&&<div className="modal-back" onClick={()=>p.setNoteFor(null)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={e=>{e.preventDefault();const n=String(new FormData(e.currentTarget).get('note'));p.setMarks(m=>({...m,[p.noteFor!]:{status:m[p.noteFor!]?.status||'present',note:n}}));p.setNoteFor(null)}}><h2>Примечание</h2><p>{p.active.students.find(s=>s.id===p.noteFor)?.name}</p><textarea name="note" defaultValue={p.marks[p.noteFor]?.note} placeholder="Например: без нагрузки" autoFocus/><div><button type="button" className="secondary" onClick={()=>p.setNoteFor(null)}>Отмена</button><button>Сохранить</button></div></form></div>}</div>}
-function Summary({active,marks,counts,back,save,copy,csv}:{active:SchoolClass;marks:Record<string,Mark>;counts:Record<Status,number>;back:()=>void;save:()=>void;copy:()=>void;csv:()=>void}){const unchecked=active.students.filter(s=>!marks[s.id]);return <><header className="simple-head"><button className="icon-btn" onClick={back}><ArrowLeft/></button><div><h1>Итоги урока</h1><span>{active.name} · {active.time}</span></div></header><section className="summary-hero"><motion.div initial={{scale:.7}} animate={{scale:1}}><CheckCircle2/></motion.div><h2>{active.name} · отметка готова</h2><p>{hd()}</p></section><div className="summary-grid">{(['present','absent','late','excused'] as Status[]).map(st=><div className={st} key={st}><strong>{counts[st]}</strong><span>{sm[st].label}</span></div>)}</div>{unchecked.length>0&&<div className="warning"><Clock3/><div><strong>Не отмечено: {unchecked.length}</strong><span>{unchecked.map(s=>s.name).join(', ')}</span></div></div>}<section className="groups">{(['absent','late','excused'] as Status[]).map(st=>{const list=active.students.filter(s=>marks[s.id]?.status===st);return list.length?<div key={st}><h3>{sm[st].label} <span>{list.length}</span></h3>{list.map(s=><p key={s.id}>{s.name}<small>{marks[s.id].note}</small></p>)}</div>:null})}{counts.absent+counts.late+counts.excused===0&&<div className="all-clear"><Check/>Весь класс присутствует — отличный старт!</div>}</section><div className="summary-actions"><button onClick={copy} className="secondary"><Copy/>Скопировать</button><button onClick={csv} className="secondary"><Download/>CSV</button><button onClick={()=>window.print()} className="secondary"><FileText/>Печать</button></div><div className="sticky-finish"><button onClick={save}><CheckCircle2/>Подтвердить и сохранить</button></div></>}
-function HistoryView({sessions,classes,back,open,remove}:{sessions:Session[];classes:SchoolClass[];back:()=>void;open:(s:Session)=>void;remove:(id:string)=>void}){const[f,setF]=useState('all');const list=sessions.filter(s=>f==='all'||s.classId===f);return <><header className="simple-head"><button className="icon-btn" onClick={back}><ArrowLeft/></button><div><h1>История</h1><span>{sessions.length} сохранённых уроков</span></div></header><div className="history-filter"><select value={f} onChange={e=>setF(e.target.value)}><option value="all">Все классы</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div className="history-list">{list.map(s=>{const c=Object.values(s.marks).reduce((a,m)=>(a[m.status]++,a),{present:0,absent:0,late:0,excused:0});return <article className="history-card" key={s.id}><button className="history-main" onClick={()=>open(s)}><div className="datebox"><strong>{new Date(s.date).getDate()}</strong><span>сен</span></div><div><h3>{s.className} <span>· {s.time}</span></h3><p><i className="dot green"/>{c.present} здесь <i className="dot red"/>{c.absent} нет <i className="dot amber"/>{c.late} опозд.</p></div><ChevronRight/></button><div className="history-actions"><button onClick={()=>open(s)}><Pencil/>Изменить</button><button onClick={()=>open(s)}><Copy/>Дублировать</button><button onClick={()=>remove(s.id)} className="danger"><Trash2/>Удалить</button></div></article>})}{!list.length&&<div className="empty"><History/><h3>Записей пока нет</h3><p>Завершите первую отметку посещаемости</p></div>}</div></>}
-function Manage({classes,setClasses,back,exportBackup,importRef,restore}:{classes:SchoolClass[];setClasses:React.Dispatch<React.SetStateAction<SchoolClass[]>>;back:()=>void;exportBackup:()=>void;importRef:React.RefObject<HTMLInputElement|null>;restore:(f?:File)=>void}){const[e,setE]=useState<string|null>(null);const add=()=>{const n=prompt('Название класса, например 6A');if(n)setClasses(x=>[...x,{id:crypto.randomUUID(),name:n,time:'09:00',students:[]}])};const paste=(id:string)=>{const t=prompt('Вставьте имена — по одному на строке');if(t)setClasses(x=>x.map(c=>c.id===id?{...c,students:[...c.students,...t.split('\n').map(name=>({id:crypto.randomUUID(),name:name.trim()})).filter(s=>s.name)]}:c))};return <><header className="simple-head"><button className="icon-btn" onClick={back}><ArrowLeft/></button><div><h1>Классы</h1><span>Ученики и локальные данные</span></div><button className="icon-btn primary-icon" onClick={add}><Plus/></button></header><div className="manage-list">{classes.map(c=><article className={`manage-card ${c.archived?'archived':''}`} key={c.id}><button className="manage-main" onClick={()=>setE(e===c.id?null:c.id)}><div className="class-badge">{c.name}</div><div><strong>{c.name}</strong><span>{c.students.length} учеников · {c.time}</span></div><ChevronRight className={e===c.id?'rotated':''}/></button>{e===c.id&&<div className="manage-detail"><div className="inline-actions"><button onClick={()=>paste(c.id)}><Clipboard/>Вставить список</button><button onClick={()=>{const n=prompt('Новое название',c.name);if(n)setClasses(x=>x.map(y=>y.id===c.id?{...y,name:n}:y))}}><Pencil/>Переименовать</button><button onClick={()=>setClasses(x=>x.map(y=>y.id===c.id?{...y,archived:!y.archived}:y))}><UserMinus/>{c.archived?'Вернуть':'В архив'}</button></div>{c.students.slice(0,8).map(s=><div className="mini-student" key={s.id}><span className="avatar">{initials(s.name)}</span><span>{s.name}</span><button onClick={()=>confirm(`Удалить ${s.name}?`)&&setClasses(x=>x.map(y=>y.id===c.id?{...y,students:y.students.filter(z=>z.id!==s.id)}:y))}><X/></button></div>)}</div>}</article>)}</div><section className="data-panel"><h2>Локальные данные</h2><p>Резервная копия сохраняет классы, учеников и историю.</p><div><button onClick={exportBackup}><Download/>Скачать копию</button><button onClick={()=>importRef.current?.click()}><Upload/>Восстановить</button><input ref={importRef} type="file" hidden onChange={e=>restore(e.target.files?.[0])}/></div><span><CheckCircle2/>Данные хранятся только на этом устройстве</span></section></>}
-function Nav({icon:Icon,label,active,onClick}:{icon:typeof HomeIcon;label:string;active?:boolean;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}><Icon/><span>{label}</span></button>}
+type Mark = { status: Status; note?: string };
+type Session = {
+  id: string;
+  classId: string;
+  className: string;
+  date: string;
+  time: string;
+  marks: Record<string, Mark>;
+  students: Student[];
+  savedAt: string;
+};
+type View = 'home' | 'attendance' | 'summary' | 'history' | 'manage';
+const rosters: Record<string, string[]> = {
+  '3c': [
+    'Erik Blechner',
+    'Emmanuel-Devid Farber',
+    'Anastassia Gunjašina',
+    'Sofia Ivanovs',
+    'Arina Kekšina',
+    'Oskar Klimov',
+    'Veronika Koledenkova',
+    'Damir Kudrjavkin',
+    'Ivan Len',
+    'Eva Lott',
+    'Miroslav Pavlov',
+    'Platon Petrychenko',
+    'Oksana Raguzova',
+    'Nikita Semtšonok',
+    'Adam Sila',
+    'Arina Smirnova',
+    'Bohdan Strasberh',
+    'Maksim Šohan',
+  ],
+  '4d': [
+    'Daniil Bõkov',
+    'Polina Fedotova',
+    'Vasilissa Fedotova',
+    'Kirill Jartšuk',
+    'Dmitri Kudrjavkin',
+    'Matvei Rassadkin',
+    'Maksim Ratsõborski',
+    'Loids Usovs',
+  ],
+  '4l': ['Ilja Gorbatov', 'Milena Pruel'],
+  '6cd': [
+    'Demid Efremov · 6D',
+    'Lucas Juuse · 6C',
+    'Rene Juvanen · 6C',
+    'Deniss Prilipko · 6C',
+    'Mihhail Šnurov · 6C',
+    'Mark Tsepelev · 6C',
+    'Artjom Vlassov · 6C',
+  ],
+  '6f': [
+    'Miron Andrianov',
+    'Deniss Andrijenko',
+    'Deniss Atamanov',
+    'Ruslan Budikov',
+    'Ruslan Bufatin',
+    'Oleksandr Burenko',
+    'Danila Gontšarov',
+    'Yakym Holin',
+    'Denis Komlenkov',
+    'Matvei Krupski',
+    'Artjom Pavlov',
+    'Damir Požaritski',
+    'Kirill Rikonen',
+    'Nikita Šabanovs',
+    'David Vaht',
+  ],
+  '4f-lo': ['Artjom Skulin'],
+  '6c-lo': [
+    'Sofia Aleksejeva',
+    'Sofia Bergen',
+    'Emilie Denisova',
+    'Aleksandra Gorina',
+    'Lucas Juuse',
+    'Rene Juvanen',
+    'Angelina Karpova',
+    'Jevgenia Luberg',
+    'Angelika Peramets',
+    'Deniss Prilipko',
+    'Arina Rajanok',
+    'Yana Shapoval',
+    'Mihhail Šnurov',
+    'Arina Šornik',
+    'Mark Tsepelev',
+    'Artjom Vlassov',
+  ],
+};
+const classSeed: [string, string, string, string[]][] = [
+  ['3c', '3C', '—', rosters['3c']],
+  ['4d', '4D · RÕK', '—', rosters['4d']],
+  ['4l', '4L · LÕK', '—', rosters['4l']],
+  ['6cd', '6C/6D · poisid', '—', rosters['6cd']],
+  ['6f', '6F · poisid', '—', rosters['6f']],
+  ['4f-lo', '4F · loodus', '—', rosters['4f-lo']],
+  ['6c-lo', '6C · loodus', '—', rosters['6c-lo']],
+];
+const demoClasses: SchoolClass[] = classSeed.map(([id, name, time, list]) => ({
+  id,
+  name,
+  time,
+  students: list.map((n, i) => ({ id: `${id}-${i}`, name: n })),
+}));
+const sm: Record<Status, { label: string; short: string; icon: typeof Check }> =
+  {
+    present: { label: 'Присутствует', short: 'Здесь', icon: Check },
+    absent: { label: 'Отсутствует', short: 'Нет', icon: X },
+    late: { label: 'Опоздал(а)', short: 'Опоздал', icon: Clock3 },
+    excused: { label: 'Освобождён(а)', short: 'Освоб.', icon: FileText },
+  };
+const dk = () => new Date().toISOString().slice(0, 10);
+const hd = (d = dk()) =>
+  new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    weekday: 'long',
+  }).format(new Date(`${d}T12:00:00`));
+const initials = (n: string) =>
+  n
+    .split(' ')
+    .map((x) => x[0])
+    .slice(0, 2)
+    .join('');
+type Lang = 'ru' | 'et';
+const LC = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({
+  lang: 'ru',
+  setLang: () => {},
+});
+const et: Record<string, string> = {
+  'Доброе утро': 'Tere hommikust',
+  'Добрый день': 'Tere päevast',
+  'Добрый вечер': 'Tere õhtust',
+  учитель: 'õpetaja',
+  'Кого отмечаем сегодня?': 'Millise klassi märgime täna?',
+  'Быстрая отметка': 'Kiire märkimine',
+  'Начать посещаемость': 'Alusta puudujate märkimist',
+  'Сегодняшние классы': 'Tänased klassid',
+  урока: 'tundi',
+  учеников: 'õpilast',
+  Спортзал: 'Spordisaal',
+  Готово: 'Valmis',
+  Начать: 'Alusta',
+  'Недавние записи': 'Viimased sissekanded',
+  'Все записи': 'Kõik sissekanded',
+  'Завершённые уроки появятся здесь': 'Lõpetatud tunnid ilmuvad siia',
+  Сегодня: 'Täna',
+  История: 'Ajalugu',
+  Классы: 'Klassid',
+  'Сохранено локально': 'Kohalikult salvestatud',
+  Отмечено: 'Märgitud',
+  'Найти ученика': 'Otsi õpilast',
+  'Все здесь': 'Kõik kohal',
+  Все: 'Kõik',
+  Здесь: 'Kohal',
+  Нет: 'Puudub',
+  Опоздал: 'Hilines',
+  'Освоб.': 'Vabastatud',
+  'Нажмите, чтобы отметить': 'Vajuta märkimiseks',
+  Примечание: 'Märkus',
+  'Например: без нагрузки': 'Näiteks: koormuseta',
+  Отмена: 'Tühista',
+  Сохранить: 'Salvesta',
+  'Завершить отметку': 'Lõpeta märkimine',
+  'Отменить изменение': 'Võta tagasi',
+  'Никого не нашли': 'Õpilasi ei leitud',
+  'Измените поиск или фильтр': 'Muuda otsingut või filtrit',
+  'Итоги урока': 'Tunni kokkuvõte',
+  'отметка готова': 'märkimine on valmis',
+  'Не отмечено': 'Märkimata',
+  Скопировать: 'Kopeeri',
+  Печать: 'Prindi',
+  'Подтвердить и сохранить': 'Kinnita ja salvesta',
+  'сохранённых уроков': 'salvestatud tundi',
+  'Все классы': 'Kõik klassid',
+  Изменить: 'Muuda',
+  Дублировать: 'Dubleeri',
+  Удалить: 'Kustuta',
+  'Записей пока нет': 'Sissekandeid veel pole',
+  'Ученики и локальные данные': 'Õpilased ja kohalikud andmed',
+  'Локальные данные': 'Kohalikud andmed',
+  'Скачать копию': 'Laadi koopia',
+  Восстановить: 'Taasta',
+};
+const useT = () => {
+  const { lang } = useContext(LC);
+  return (s: string) => (lang === 'et' ? et[s] || s : s);
+};
+export default function App() {
+  const reduced = useReducedMotion();
+  const [classes, setClasses] = useState(demoClasses);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [view, setView] = useState<View>('home');
+  const [active, setActive] = useState<SchoolClass | null>(null);
+  const [marks, setMarks] = useState<Record<string, Mark>>({});
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | Status>('all');
+  const [saved, setSaved] = useState(false);
+  const [undo, setUndo] = useState<{ id: string; mark: Mark } | null>(null);
+  const [menu, setMenu] = useState<string | null>(null);
+  const [noteFor, setNoteFor] = useState<string | null>(null);
+  const [toast, setToast] = useState('');
+  const importRef = useRef<HTMLInputElement>(null);
+  const [lang, setLang] = useState<Lang>('ru');
+  useEffect(() => {
+    if (localStorage.getItem('sportroll-lang') === 'et') setLang('et');
+  }, []);
+  const changeLang = (l: Lang) => {
+    setLang(l);
+    localStorage.setItem('sportroll-lang', l);
+  };
+  useEffect(() => {
+    try {
+      const c = localStorage.getItem('sportroll-classes'),
+        s = localStorage.getItem('sportroll-sessions'),
+        version = localStorage.getItem('sportroll-roster-version');
+      if (c && version === '2') setClasses(JSON.parse(c));
+      else {
+        const existing: SchoolClass[] = c ? JSON.parse(c) : [];
+        const custom = existing.filter(
+          (x) => !['7a', '8b', '9v'].includes(x.id),
+        );
+        setClasses([
+          ...demoClasses,
+          ...custom.filter((x) => !demoClasses.some((d) => d.id === x.id)),
+        ]);
+        localStorage.setItem('sportroll-roster-version', '2');
+      }
+      if (s) setSessions(JSON.parse(s));
+    } catch {}
+  }, []);
+  useEffect(
+    () => localStorage.setItem('sportroll-classes', JSON.stringify(classes)),
+    [classes],
+  );
+  useEffect(
+    () => localStorage.setItem('sportroll-sessions', JSON.stringify(sessions)),
+    [sessions],
+  );
+  useEffect(() => {
+    if (active && view === 'attendance') {
+      localStorage.setItem(
+        `sportroll-draft-${active.id}-${dk()}`,
+        JSON.stringify(marks),
+      );
+      setSaved(true);
+      const t = setTimeout(() => setSaved(false), 1400);
+      return () => clearTimeout(t);
+    }
+  }, [marks, active, view]);
+  const counts = useMemo(
+    () =>
+      Object.values(marks).reduce((a, m) => (a[m.status]++, a), {
+        present: 0,
+        absent: 0,
+        late: 0,
+        excused: 0,
+      }),
+    [marks],
+  );
+  const notify = (s: string) => {
+    setToast(s);
+    setTimeout(() => setToast(''), 2100);
+  };
+  const openClass = (c: SchoolClass, existing?: Session) => {
+    setActive(c);
+    setMarks(
+      existing?.marks ??
+        JSON.parse(
+          localStorage.getItem(`sportroll-draft-${c.id}-${dk()}`) || '{}',
+        ),
+    );
+    setSearch('');
+    setFilter('all');
+    setView('attendance');
+  };
+  const update = (id: string, status: Status) => {
+    if (marks[id]) setUndo({ id, mark: marks[id] });
+    setMarks((m) => ({ ...m, [id]: { ...m[id], status } }));
+    setMenu(null);
+  };
+  const all = () => {
+    if (active) {
+      setMarks(
+        Object.fromEntries(
+          active.students.map((s) => [s.id, { status: 'present' }]),
+        ),
+      );
+      notify('Все отмечены как присутствующие');
+    }
+  };
+  const text = () =>
+    active
+      ? `${active.name} · ${hd()} · ${active.time}\nПрисутствуют: ${counts.present}/${active.students.length}\n` +
+        (['absent', 'late', 'excused'] as Status[])
+          .map(
+            (st) =>
+              `${sm[st].label}: ${active.students
+                .filter((s) => marks[s.id]?.status === st)
+                .map((s) => s.name)
+                .join(', ')}`,
+          )
+          .filter((x) => !x.endsWith(': '))
+          .join('\n')
+      : '';
+  const copy = async () => {
+    await navigator.clipboard.writeText(text());
+    notify('Сводка скопирована');
+  };
+  const csv = () => {
+    if (!active) return;
+    const rows = [
+      'Имя,Статус,Примечание',
+      ...active.students.map(
+        (s) =>
+          `"${s.name}","${marks[s.id] ? sm[marks[s.id].status].label : 'Не отмечен'}","${marks[s.id]?.note || ''}"`,
+      ),
+    ];
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(
+      new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv' }),
+    );
+    a.download = `${active.name}-${dk()}.csv`;
+    a.click();
+  };
+  const save = () => {
+    if (!active) return;
+    const s: Session = {
+      id: `${active.id}-${dk()}`,
+      classId: active.id,
+      className: active.name,
+      date: dk(),
+      time: active.time,
+      marks,
+      students: active.students,
+      savedAt: new Date().toISOString(),
+    };
+    setSessions((x) => [s, ...x.filter((y) => y.id !== s.id)]);
+    localStorage.removeItem(`sportroll-draft-${active.id}-${dk()}`);
+    notify('Посещаемость сохранена');
+    setView('home');
+  };
+  const back = () => setView(view === 'summary' ? 'attendance' : 'home');
+  const exportBackup = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(
+      new Blob([JSON.stringify({ classes, sessions }, null, 2)], {
+        type: 'application/json',
+      }),
+    );
+    a.download = 'sportroll-backup.json';
+    a.click();
+  };
+  const restore = (f?: File) => {
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const d = JSON.parse(String(r.result));
+        setClasses(d.classes);
+        setSessions(d.sessions);
+        notify('Копия восстановлена');
+      } catch {
+        notify('Файл не читается');
+      }
+    };
+    r.readAsText(f);
+  };
+  return (
+    <LC.Provider value={{ lang, setLang: changeLang }}>
+    <div className="app-shell">
+      <AnimatePresence mode="wait">
+        <motion.main
+          key={view}
+          initial={reduced ? false : { opacity: 0, x: 12 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -8 }}
+          transition={{ duration: 0.18 }}
+          className="page"
+        >
+          {view === 'home' && (
+            <HomeView
+              classes={classes.filter((c) => !c.archived)}
+              sessions={sessions}
+              open={openClass}
+              history={() => setView('history')}
+              manage={() => setView('manage')}
+            />
+          )}{' '}
+          {view === 'attendance' && active && (
+            <Attendance
+              active={active}
+              marks={marks}
+              setMarks={setMarks}
+              counts={counts}
+              search={search}
+              setSearch={setSearch}
+              filter={filter}
+              setFilter={setFilter}
+              update={update}
+              all={all}
+              back={back}
+              finish={() => setView('summary')}
+              saved={saved}
+              undo={undo}
+              onUndo={() => {
+                if (undo) setMarks((m) => ({ ...m, [undo.id]: undo.mark }));
+                setUndo(null);
+              }}
+              menu={menu}
+              setMenu={setMenu}
+              noteFor={noteFor}
+              setNoteFor={setNoteFor}
+            />
+          )}{' '}
+          {view === 'summary' && active && (
+            <Summary
+              active={active}
+              marks={marks}
+              counts={counts}
+              back={back}
+              save={save}
+              copy={copy}
+              csv={csv}
+            />
+          )}{' '}
+          {view === 'history' && (
+            <HistoryView
+              sessions={sessions}
+              classes={classes}
+              back={back}
+              open={(s) => {
+                const c = classes.find((x) => x.id === s.classId);
+                if (c) openClass(c, s);
+              }}
+              remove={(id) =>
+                confirm('Удалить эту запись?') &&
+                setSessions((x) => x.filter((s) => s.id !== id))
+              }
+            />
+          )}{' '}
+          {view === 'manage' && (
+            <Manage
+              classes={classes}
+              setClasses={setClasses}
+              back={back}
+              exportBackup={exportBackup}
+              importRef={importRef}
+              restore={restore}
+            />
+          )}
+        </motion.main>
+      </AnimatePresence>
+      {view === 'home' && (
+        <nav className="bottom-nav">
+          <Nav icon={HomeIcon} label={lang==='et'?'Täna':'Сегодня'} active onClick={() => {}} />
+          <Nav
+            icon={History}
+            label={lang==='et'?'Ajalugu':'История'}
+            onClick={() => setView('history')}
+          />
+          <Nav icon={Users} label={lang==='et'?'Klassid':'Классы'} onClick={() => setView('manage')} />
+        </nav>
+      )}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            className="toast"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            <CheckCircle2 />
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+    </LC.Provider>
+  );
+}
+function HomeView({
+  classes,
+  sessions,
+  open,
+  history,
+  manage,
+}: {
+  classes: SchoolClass[];
+  sessions: Session[];
+  open: (c: SchoolClass) => void;
+  history: () => void;
+  manage: () => void;
+}) {
+  const h = new Date().getHours();
+  const t=useT();const{lang,setLang}=useContext(LC);
+  return (
+    <>
+      <header className="home-head">
+        <div>
+          <p className="eyebrow">{hd()}</p>
+          <h1>
+            {t(h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер')}, {t('учитель')}
+          </h1>
+          <p className="sub">{t('Кого отмечаем сегодня?')}</p>
+        </div>
+        <div className="header-actions"><button className="lang-switch" onClick={()=>setLang(lang==='ru'?'et':'ru')} aria-label="Change language">{lang==='ru'?'ET':'RU'}</button><button className="icon-btn" onClick={manage} aria-label={t('Классы')}><Settings /></button></div>
+      </header>
+      <section className="hero-action">
+        <div className="hero-icon">
+          <UserCheck />
+        </div>
+        <div>
+          <span>{t('Быстрая отметка')}</span>
+          <strong>{t('Начать посещаемость')}</strong>
+        </div>
+        <ChevronRight />
+      </section>
+      <section>
+        <div className="section-title">
+          <h2>{t('Сегодняшние классы')}</h2>
+          <span>{classes.length} {t('урока')}</span>
+        </div>
+        <div className="class-list">
+          {classes.map((c, i) => {
+            const done = sessions.some(
+              (s) => s.classId === c.id && s.date === dk(),
+            );
+            return (
+              <motion.button
+                className="class-card"
+                key={c.id}
+                onClick={() => open(c)}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
+              >
+                <div className="class-badge">{c.name}</div>
+                <div className="class-info">
+                  <strong>{c.students.length} {t('учеников')}</strong>
+                  <span>
+                    <Clock3 />
+                    {c.time} · {t('Спортзал')}
+                  </span>
+                </div>
+                {done ? (
+                  <span className="done">
+                    <Check />
+                    {t('Готово')}
+                  </span>
+                ) : (
+                  <span className="start">
+                    {t('Начать')} <ChevronRight />
+                  </span>
+                )}
+              </motion.button>
+            );
+          })}
+        </div>
+      </section>
+      <section className="recent">
+        <div className="section-title">
+          <h2>{t('Недавние записи')}</h2>
+          <button onClick={history}>{t('Все записи')}</button>
+        </div>
+        {sessions.length ? (
+          <div className="recent-row">
+            <div className="recent-date">
+              <strong>{new Date(sessions[0].date).getDate()}</strong>
+              <span>сен</span>
+            </div>
+            <div>
+              <strong>
+                {sessions[0].className} · {sessions[0].time}
+              </strong>
+              <span>
+                {
+                  Object.values(sessions[0].marks).filter(
+                    (m) => m.status === 'present',
+                  ).length
+                }{' '}
+                из {sessions[0].students.length} присутствовали
+              </span>
+            </div>
+            <ChevronRight />
+          </div>
+        ) : (
+          <div className="empty-mini">
+            <CalendarDays />
+            {t('Завершённые уроки появятся здесь')}
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+function Attendance(p: {
+  active: SchoolClass;
+  marks: Record<string, Mark>;
+  setMarks: React.Dispatch<React.SetStateAction<Record<string, Mark>>>;
+  counts: Record<Status, number>;
+  search: string;
+  setSearch: (s: string) => void;
+  filter: 'all' | Status;
+  setFilter: (s: 'all' | Status) => void;
+  update: (id: string, s: Status) => void;
+  all: () => void;
+  back: () => void;
+  finish: () => void;
+  saved: boolean;
+  undo: { id: string; mark: Mark } | null;
+  onUndo: () => void;
+  menu: string | null;
+  setMenu: (s: string | null) => void;
+  noteFor: string | null;
+  setNoteFor: (s: string | null) => void;
+}) {
+  const t = useT();
+  const shown = p.active.students.filter(
+    (s) =>
+      s.name.toLowerCase().includes(p.search.toLowerCase()) &&
+      (p.filter === 'all' || p.marks[s.id]?.status === p.filter),
+  );
+  return (
+    <div className="attendance">
+      <header className="att-head">
+        <button className="icon-btn" onClick={p.back}>
+          <ArrowLeft />
+        </button>
+        <div>
+          <h1>{p.active.name}</h1>
+          <span>
+            {hd()} · {p.active.time}
+          </span>
+        </div>
+        <button className="icon-btn">
+          <MoreHorizontal />
+        </button>
+      </header>
+      <div className="progress-wrap">
+        <div>
+          <strong>
+            {Object.keys(p.marks).length} из {p.active.students.length}
+          </strong>
+          <span>{t(p.saved ? 'Сохранено локально' : 'Отмечено')}</span>
+        </div>
+        <div className="progress">
+          <i
+            style={{
+              width: `${(Object.keys(p.marks).length / p.active.students.length) * 100}%`,
+            }}
+          />
+        </div>
+      </div>
+      <div className="tools">
+        <label className="search">
+          <Search />
+          <input
+            value={p.search}
+            onChange={(e) => p.setSearch(e.target.value)}
+            placeholder={t('Найти ученика')}
+          />
+        </label>
+        <button className="all-present" onClick={p.all}>
+          <UserRoundCheck />
+          {t('Все здесь')}
+        </button>
+      </div>
+      <div className="counts">
+        <button
+          className={p.filter === 'all' ? 'active' : ''}
+          onClick={() => p.setFilter('all')}
+        >
+          <b>{p.active.students.length}</b>
+          <span>{t('Все')}</span>
+        </button>
+        {(['present', 'absent', 'late', 'excused'] as Status[]).map((st) => (
+          <button
+            key={st}
+            className={`${st} ${p.filter === st ? 'active' : ''}`}
+            onClick={() => p.setFilter(st)}
+          >
+            <b>{p.counts[st]}</b>
+            <span>{t(sm[st].short)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="roster">
+        {shown.map((s, i) => {
+          const st = p.marks[s.id]?.status;
+          return (
+            <motion.div
+              key={s.id}
+              className={`student-row ${st || 'unchecked'}`}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.018, 0.2) }}
+            >
+              <button
+                className="student-main"
+                onClick={() =>
+                  p.update(s.id, st === 'present' ? 'absent' : 'present')
+                }
+              >
+                <span className="avatar">{initials(s.name)}</span>
+                <span className="student-name">
+                  <strong>{s.name}</strong>
+                  <small>
+                    {p.marks[s.id]?.note ||
+                      (!st ? t('Нажмите, чтобы отметить') : '')}
+                  </small>
+                </span>
+                {st ? (
+                  (() => {
+                    const I = sm[st].icon;
+                    return (
+                      <span className={`state ${st}`}>
+                        <I />
+                        {t(sm[st].short)}
+                      </span>
+                    );
+                  })()
+                ) : (
+                  <span className="state empty">—</span>
+                )}
+              </button>
+              <button
+                className="more"
+                onClick={() => p.setMenu(p.menu === s.id ? null : s.id)}
+              >
+                <MoreHorizontal />
+              </button>
+              {p.menu === s.id && (
+                <div className="status-menu">
+                  {(['present', 'absent', 'late', 'excused'] as Status[]).map(
+                    (x) => {
+                      const I = sm[x].icon;
+                      return (
+                        <button key={x} onClick={() => p.update(s.id, x)}>
+                          <I className={x} />
+                          {t(sm[x].label)}
+                        </button>
+                      );
+                    },
+                  )}
+                  <button
+                    onClick={() => {
+                      p.setNoteFor(s.id);
+                      p.setMenu(null);
+                    }}
+                  >
+                    <Pencil />
+                    {t('Примечание')}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
+        {!shown.length && (
+          <div className="empty">
+            <Search />
+            <h3>{t('Никого не нашли')}</h3>
+            <p>{t('Измените поиск или фильтр')}</p>
+          </div>
+        )}
+      </div>
+      {p.undo && (
+        <button className="undo" onClick={p.onUndo}>
+          <RotateCcw />
+          {t('Отменить изменение')}
+        </button>
+      )}
+      <div className="sticky-finish">
+        <button onClick={p.finish}>
+          {t('Завершить отметку')}{' '}
+          <span>
+            {Object.keys(p.marks).length}/{p.active.students.length}
+          </span>
+        </button>
+      </div>
+      {p.noteFor && (
+        <div className="modal-back" onClick={() => p.setNoteFor(null)}>
+          <form
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              const n = String(new FormData(e.currentTarget).get('note'));
+              p.setMarks((m) => ({
+                ...m,
+                [p.noteFor!]: {
+                  status: m[p.noteFor!]?.status || 'present',
+                  note: n,
+                },
+              }));
+              p.setNoteFor(null);
+            }}
+          >
+            <h2>{t('Примечание')}</h2>
+            <p>{p.active.students.find((s) => s.id === p.noteFor)?.name}</p>
+            <textarea
+              name="note"
+              defaultValue={p.marks[p.noteFor]?.note}
+              placeholder={t('Например: без нагрузки')}
+              autoFocus
+            />
+            <div>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => p.setNoteFor(null)}
+              >
+                {t('Отмена')}
+              </button>
+              <button>{t('Сохранить')}</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+function Summary({
+  active,
+  marks,
+  counts,
+  back,
+  save,
+  copy,
+  csv,
+}: {
+  active: SchoolClass;
+  marks: Record<string, Mark>;
+  counts: Record<Status, number>;
+  back: () => void;
+  save: () => void;
+  copy: () => void;
+  csv: () => void;
+}) {
+  const t = useT();
+  const unchecked = active.students.filter((s) => !marks[s.id]);
+  return (
+    <>
+      <header className="simple-head">
+        <button className="icon-btn" onClick={back}>
+          <ArrowLeft />
+        </button>
+        <div>
+          <h1>{t('Итоги урока')}</h1>
+          <span>
+            {active.name} · {active.time}
+          </span>
+        </div>
+      </header>
+      <section className="summary-hero">
+        <motion.div initial={{ scale: 0.7 }} animate={{ scale: 1 }}>
+          <CheckCircle2 />
+        </motion.div>
+        <h2>{active.name} · {t('отметка готова')}</h2>
+        <p>{hd()}</p>
+      </section>
+      <div className="summary-grid">
+        {(['present', 'absent', 'late', 'excused'] as Status[]).map((st) => (
+          <div className={st} key={st}>
+            <strong>{counts[st]}</strong>
+            <span>{t(sm[st].label)}</span>
+          </div>
+        ))}
+      </div>
+      {unchecked.length > 0 && (
+        <div className="warning">
+          <Clock3 />
+          <div>
+            <strong>{t('Не отмечено')}: {unchecked.length}</strong>
+            <span>{unchecked.map((s) => s.name).join(', ')}</span>
+          </div>
+        </div>
+      )}
+      <section className="groups">
+        {(['absent', 'late', 'excused'] as Status[]).map((st) => {
+          const list = active.students.filter(
+            (s) => marks[s.id]?.status === st,
+          );
+          return list.length ? (
+            <div key={st}>
+              <h3>
+                {t(sm[st].label)} <span>{list.length}</span>
+              </h3>
+              {list.map((s) => (
+                <p key={s.id}>
+                  {s.name}
+                  <small>{marks[s.id].note}</small>
+                </p>
+              ))}
+            </div>
+          ) : null;
+        })}
+        {counts.absent + counts.late + counts.excused === 0 && (
+          <div className="all-clear">
+            <Check />
+            {t('Весь класс присутствует — отличный старт!')}
+          </div>
+        )}
+      </section>
+      <div className="summary-actions">
+        <button onClick={copy} className="secondary">
+          <Copy />
+          {t('Скопировать')}
+        </button>
+        <button onClick={csv} className="secondary">
+          <Download />
+          CSV
+        </button>
+        <button onClick={() => window.print()} className="secondary">
+          <FileText />
+          {t('Печать')}
+        </button>
+      </div>
+      <div className="sticky-finish">
+        <button onClick={save}>
+          <CheckCircle2 />
+          {t('Подтвердить и сохранить')}
+        </button>
+      </div>
+    </>
+  );
+}
+function HistoryView({
+  sessions,
+  classes,
+  back,
+  open,
+  remove,
+}: {
+  sessions: Session[];
+  classes: SchoolClass[];
+  back: () => void;
+  open: (s: Session) => void;
+  remove: (id: string) => void;
+}) {
+  const t = useT();
+  const [f, setF] = useState('all');
+  const list = sessions.filter((s) => f === 'all' || s.classId === f);
+  return (
+    <>
+      <header className="simple-head">
+        <button className="icon-btn" onClick={back}>
+          <ArrowLeft />
+        </button>
+        <div>
+          <h1>{t('История')}</h1>
+          <span>{sessions.length} {t('сохранённых уроков')}</span>
+        </div>
+      </header>
+      <div className="history-filter">
+        <select value={f} onChange={(e) => setF(e.target.value)}>
+          <option value="all">{t('Все классы')}</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="history-list">
+        {list.map((s) => {
+          const c = Object.values(s.marks).reduce(
+            (a, m) => (a[m.status]++, a),
+            { present: 0, absent: 0, late: 0, excused: 0 },
+          );
+          return (
+            <article className="history-card" key={s.id}>
+              <button className="history-main" onClick={() => open(s)}>
+                <div className="datebox">
+                  <strong>{new Date(s.date).getDate()}</strong>
+                  <span>сен</span>
+                </div>
+                <div>
+                  <h3>
+                    {s.className} <span>· {s.time}</span>
+                  </h3>
+                  <p>
+                    <i className="dot green" />
+                    {c.present} здесь <i className="dot red" />
+                    {c.absent} нет <i className="dot amber" />
+                    {c.late} опозд.
+                  </p>
+                </div>
+                <ChevronRight />
+              </button>
+              <div className="history-actions">
+                <button onClick={() => open(s)}>
+                  <Pencil />
+                  {t('Изменить')}
+                </button>
+                <button onClick={() => open(s)}>
+                  <Copy />
+                  {t('Дублировать')}
+                </button>
+                <button onClick={() => remove(s.id)} className="danger">
+                  <Trash2 />
+                  {t('Удалить')}
+                </button>
+              </div>
+            </article>
+          );
+        })}
+        {!list.length && (
+          <div className="empty">
+            <History />
+            <h3>{t('Записей пока нет')}</h3>
+            <p>Завершите первую отметку посещаемости</p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+function Manage({
+  classes,
+  setClasses,
+  back,
+  exportBackup,
+  importRef,
+  restore,
+}: {
+  classes: SchoolClass[];
+  setClasses: React.Dispatch<React.SetStateAction<SchoolClass[]>>;
+  back: () => void;
+  exportBackup: () => void;
+  importRef: React.RefObject<HTMLInputElement | null>;
+  restore: (f?: File) => void;
+}) {
+  const t = useT();
+  const [e, setE] = useState<string | null>(null);
+  const add = () => {
+    const n = prompt('Название класса, например 6A');
+    if (n)
+      setClasses((x) => [
+        ...x,
+        { id: crypto.randomUUID(), name: n, time: '09:00', students: [] },
+      ]);
+  };
+  const paste = (id: string) => {
+    const t = prompt('Вставьте имена — по одному на строке');
+    if (t)
+      setClasses((x) =>
+        x.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                students: [
+                  ...c.students,
+                  ...t
+                    .split('\n')
+                    .map((name) => ({
+                      id: crypto.randomUUID(),
+                      name: name.trim(),
+                    }))
+                    .filter((s) => s.name),
+                ],
+              }
+            : c,
+        ),
+      );
+  };
+  return (
+    <>
+      <header className="simple-head">
+        <button className="icon-btn" onClick={back}>
+          <ArrowLeft />
+        </button>
+        <div>
+          <h1>{t('Классы')}</h1>
+          <span>{t('Ученики и локальные данные')}</span>
+        </div>
+        <button className="icon-btn primary-icon" onClick={add}>
+          <Plus />
+        </button>
+      </header>
+      <div className="manage-list">
+        {classes.map((c) => (
+          <article
+            className={`manage-card ${c.archived ? 'archived' : ''}`}
+            key={c.id}
+          >
+            <button
+              className="manage-main"
+              onClick={() => setE(e === c.id ? null : c.id)}
+            >
+              <div className="class-badge">{c.name}</div>
+              <div>
+                <strong>{c.name}</strong>
+                <span>
+                  {c.students.length} учеников · {c.time}
+                </span>
+              </div>
+              <ChevronRight className={e === c.id ? 'rotated' : ''} />
+            </button>
+            {e === c.id && (
+              <div className="manage-detail">
+                <div className="inline-actions">
+                  <button onClick={() => paste(c.id)}>
+                    <Clipboard />
+                    Вставить список
+                  </button>
+                  <button
+                    onClick={() => {
+                      const n = prompt('Новое название', c.name);
+                      if (n)
+                        setClasses((x) =>
+                          x.map((y) => (y.id === c.id ? { ...y, name: n } : y)),
+                        );
+                    }}
+                  >
+                    <Pencil />
+                    Переименовать
+                  </button>
+                  <button
+                    onClick={() =>
+                      setClasses((x) =>
+                        x.map((y) =>
+                          y.id === c.id ? { ...y, archived: !y.archived } : y,
+                        ),
+                      )
+                    }
+                  >
+                    <UserMinus />
+                    {c.archived ? 'Вернуть' : 'В архив'}
+                  </button>
+                </div>
+                {c.students.slice(0, 8).map((s) => (
+                  <div className="mini-student" key={s.id}>
+                    <span className="avatar">{initials(s.name)}</span>
+                    <span>{s.name}</span>
+                    <button
+                      onClick={() =>
+                        confirm(`Удалить ${s.name}?`) &&
+                        setClasses((x) =>
+                          x.map((y) =>
+                            y.id === c.id
+                              ? {
+                                  ...y,
+                                  students: y.students.filter(
+                                    (z) => z.id !== s.id,
+                                  ),
+                                }
+                              : y,
+                          ),
+                        )
+                      }
+                    >
+                      <X />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+      <section className="data-panel">
+        <h2>Локальные данные</h2>
+        <p>Резервная копия сохраняет классы, учеников и историю.</p>
+        <div>
+          <button onClick={exportBackup}>
+            <Download />
+            Скачать копию
+          </button>
+          <button onClick={() => importRef.current?.click()}>
+            <Upload />
+            Восстановить
+          </button>
+          <input
+            ref={importRef}
+            type="file"
+            hidden
+            onChange={(e) => restore(e.target.files?.[0])}
+          />
+        </div>
+        <span>
+          <CheckCircle2 />
+          Данные хранятся только на этом устройстве
+        </span>
+      </section>
+    </>
+  );
+}
+function Nav({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: typeof HomeIcon;
+  label: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button className={active ? 'active' : ''} onClick={onClick}>
+      <Icon />
+      <span>{label}</span>
+    </button>
+  );
+}
